@@ -2,42 +2,15 @@ package org.bingo90;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.IntStream;
 
 public class BingoGenerator {
 
-    private int[][] tickets;
-    private SimpleRNG random = new SimpleRNG();
+    private final Random random = ThreadLocalRandom.current();
 
     public BingoGenerator() {
-        List<Integer> validRows = new ArrayList<>();
-
-        // generate all valid rows
-        for (int n = 0; n < 512; ++n) {
-            int sum = 0;
-            for (int i = 0; i < 9; ++i) {
-                sum += isBitSet(n, i) ? 1 : 0;
-            }
-            if (sum == 5) validRows.add(n);
-        }
-        int[] rows = validRows.stream().mapToInt(Integer::intValue).toArray();
-
-        // generate all valid stripes
-        List <int[]> ticketList = new ArrayList<>();
-        for (int i = 0; i < rows.length; ++i) {
-            for (int j = 0; j < rows.length; ++j) {
-                for (int k = 0; k < rows.length; ++k) {
-                    if ((rows[i] | rows[j] | rows[k]) == 0b111111111) {
-                        ticketList.add(new int[]{rows[i], rows[j], rows[k]});
-                    }
-                }
-            }
-        }
-        tickets = ticketList.toArray(new int[0][]);
-    }
-
-    private static boolean isBitSet(int n, int bit) {
-        return (n & (1 << bit)) != 0;
     }
 
     public int[][] generate() {
@@ -48,61 +21,109 @@ public class BingoGenerator {
     }
 
     private int[][] generateRandomTicketLayout() {
-        retry: while (true) {
-            int[] ticket0 = tickets[random.nextInt(tickets.length)];
-            int[] ticket1 = tickets[random.nextInt(tickets.length)];
-            int[] ticket2 = tickets[random.nextInt(tickets.length)];
-            int[] ticket3 = tickets[random.nextInt(tickets.length)];
-            int[] ticket4 = tickets[random.nextInt(tickets.length)];
-            int[] ticket5 = tickets[random.nextInt(tickets.length)];
+        int[][] layout = new int[][]{
+                shuffle(new int[]{1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0}),
+                shuffle(new int[]{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0}),
+                shuffle(new int[]{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0}),
+                shuffle(new int[]{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0}),
+                shuffle(new int[]{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0}),
+                shuffle(new int[]{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0}),
+                shuffle(new int[]{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0}),
+                shuffle(new int[]{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0}),
+                shuffle(new int[]{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0})
+        };
 
-            // check if the first column has required number of bits (9)
-            int nonZeroNumbersCount = bitsSet(ticket0,0) + bitsSet(ticket1,0) + bitsSet(ticket2,0) + bitsSet(ticket3,0) + bitsSet(ticket4,0) + bitsSet(ticket5,0);
-            if (nonZeroNumbersCount != 9)
-                continue;
+        relaxColumns(layout);
 
-            // check if the next 7 columns have required number of bits (10)
-            for (int i = 1; i < 8; ++i) {
-                nonZeroNumbersCount = bitsSet(ticket0,i) + bitsSet(ticket1,i) + bitsSet(ticket2,i) + bitsSet(ticket3,i) + bitsSet(ticket4,i) + bitsSet(ticket5,i);
-                if (nonZeroNumbersCount != 10)
-                    continue retry;
+        relaxRows(layout);
+
+        return transpose(layout);
+    }
+
+    private void relaxRows(int[][] layout) {
+        int[] rowBitCount = new int[18];
+        for (int row = 0; row < 18; ++row) {
+            for (int col = 0; col < 9; ++col) {
+                rowBitCount[row] += layout[col][row];
             }
+        }
 
-            // check if the last column has required number of bits (11)
-            nonZeroNumbersCount = bitsSet(ticket0,8) + bitsSet(ticket1,8) + bitsSet(ticket2,8) + bitsSet(ticket3,8) + bitsSet(ticket4,8) + bitsSet(ticket5,8);
-            if (nonZeroNumbersCount != 11)
-                continue;
+        for (int scannedRow = 0; scannedRow < 18; ++scannedRow) {
+            while (rowBitCount[scannedRow] > 5) {
+                int colToSwitch = random.nextInt(9);
+                
+                int rowToSwitch = findRowWithLowerCount(rowBitCount);
 
-            // expand bit fields into int arrays with ones and zeros
-            return new int[][]{
-                    expandBitField(ticket0[0], 9), expandBitField(ticket0[1], 9), expandBitField(ticket0[2], 9),
-                    expandBitField(ticket1[0], 9), expandBitField(ticket1[1], 9), expandBitField(ticket1[2], 9),
-                    expandBitField(ticket2[0], 9), expandBitField(ticket2[1], 9), expandBitField(ticket2[2], 9),
-                    expandBitField(ticket3[0], 9), expandBitField(ticket3[1], 9), expandBitField(ticket3[2], 9),
-                    expandBitField(ticket4[0], 9), expandBitField(ticket4[1], 9), expandBitField(ticket4[2], 9),
-                    expandBitField(ticket5[0], 9), expandBitField(ticket5[1], 9), expandBitField(ticket5[2], 9),
-            };
+                if ((rowToSwitch / 3 == scannedRow / 3) || canSwitchOne(scannedRow, layout[colToSwitch])) {
+                    if (layout[colToSwitch][scannedRow] == 1 && layout[colToSwitch][rowToSwitch] == 0) {
+                        layout[colToSwitch][scannedRow] = 0;
+                        rowBitCount[scannedRow] -= 1;
+                        layout[colToSwitch][rowToSwitch] = 1;
+                        rowBitCount[rowToSwitch] += 1;
+                    }
+                }
+            }
         }
     }
 
-    private static int bitsSet(int[] ticket, int bit) {
-        int mask = 1 << bit;
-        return ((ticket[0] & mask) == 0 ? 0 : 1) +
-                ((ticket[1] & mask) == 0 ? 0 : 1) +
-                ((ticket[2] & mask) == 0 ? 0 : 1);
+    private void relaxColumns(int[][] layout) {
+        for (int col = 0; col < layout.length; ++col) {
+            cnt: for (int ticket = 0; ticket < 6; ++ticket) {
+                if (countBits(layout[col], ticket) == 0) {
+                    for (int t = (ticket + 1) % 6; t != ticket; t = (t + 1) % 6) {
+                        if (countBits(layout[col], t) == 3) {
+                            int i = random.nextInt(3);
+                            layout[col][ticket * 3 + i] = 1;
+                            layout[col][t * 3 + i] = 0;
+                            continue cnt;
+                        }
+                    }
+                    for (int t = (ticket + 1) % 6; t != ticket; t = (t + 1) % 6) {
+                        if (countBits(layout[col], t) == 2) {
+                            int i = random.nextInt(3);
+                            while (layout[col][t * 3 + i] == 0)
+                                i = random.nextInt(3);
+                            layout[col][ticket * 3 + i] = 1;
+                            layout[col][t * 3 + i] = 0;
+                            continue cnt;
+                        }
+                    }
+                }
+            }
+        }
     }
 
-    private static int[] expandBitField(int n, int size) {
-        int[] result = new int[size];
-        for (int i = 0; i < size; ++i) {
-            result[i] = isBitSet(n, i) ? 1 : 0;
+    private static boolean canSwitchOne(int row, int[] layout) {
+        int topTicketIdx = (row / 3) * 3;
+        return (layout[topTicketIdx] + layout[topTicketIdx + 1] + layout[topTicketIdx + 2]) > 1;
+    }
+
+    private static int findRowWithLowerCount(int[] rowBitCnt) {
+        for (int i = 0; i < rowBitCnt.length; ++i) {
+            if (rowBitCnt[i] < 5)
+                return i;
+        }
+        throw new IllegalStateException();
+    }
+
+    private static int countBits(int[] arr, int ticket) {
+        return arr[ticket * 3] + arr[ticket * 3 + 1] + arr[ticket * 3 + 2];
+    }
+
+    private static int[][] transpose(int[][] array) {
+        int[][] result = new int[array[0].length][];
+        for (int row = 0; row < result.length; ++row) {
+            result[row] = new int[array.length];
+            for (int col = 0; col < result[0].length; ++col) {
+                result[row][col] = array[col][row];
+            }
         }
         return result;
     }
 
     private int[][] generateShuffledNumberColumns() {
         int[][] result = new int[9][];
-        result[0] = shuffle(IntStream.range(1,10).toArray());
+        result[0] = shuffle(IntStream.range(1, 10).toArray());
         for (int i = 1; i < 8; ++i) {
             result[i] = shuffle(IntStream.range(i * 10, (i + 1) * 10).toArray());
         }
@@ -170,10 +191,10 @@ public class BingoGenerator {
         System.out.println(ticketsToString(results.get(0)));
     }
 
-    private static String ticketsToString(int[][] ticketRows) {
+    static String ticketsToString(int[][] ticketRows) {
         StringBuilder sb = new StringBuilder();
         for (int[] ticketRow : ticketRows) {
-            for(int n : ticketRow)
+            for (int n : ticketRow)
                 sb.append(n > 9 ? ("" + n) : (" " + n)).append(", ");
             sb.delete(sb.length() - 2, sb.length());
             sb.append(System.lineSeparator());

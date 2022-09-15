@@ -21,7 +21,7 @@ public class BingoGeneratorTest {
     }
 
     @Test
-    void generated_ticket_has_correct_number_ofNumbers_in_row() {
+    void generated_ticket_has_correct_number_of_numbers_in_row() {
         // given
         // when
         int[][] ticket = sut.generate();
@@ -32,7 +32,10 @@ public class BingoGeneratorTest {
             for (int col = 0; col < ticket[0].length; ++col) {
                 nonZeroCount += (row[col] == 0 ? 0 : 1);
             }
-            assertEquals(5, nonZeroCount);
+            if (nonZeroCount != 5) {
+                System.out.println(BingoGenerator.ticketsToString(ticket));
+                assertEquals(5, nonZeroCount);
+            }
         }
     }
 
@@ -49,7 +52,8 @@ public class BingoGeneratorTest {
         }
         assertEquals(9, nonZeroCount);
 
-        for (int col = 1; col < ticket[0].length - 1; ++col) {
+        int lastColumnIdx = ticket[0].length - 1;
+        for (int col = 1; col < lastColumnIdx; ++col) {
             nonZeroCount = 0;
             for (int[] row : ticket) {
                 nonZeroCount += row[col] == 0 ? 0 : 1;
@@ -59,7 +63,7 @@ public class BingoGeneratorTest {
 
         nonZeroCount = 0;
         for (int[] row : ticket) {
-            nonZeroCount += row[8] == 0 ? 0 : 1;
+            nonZeroCount += row[lastColumnIdx] == 0 ? 0 : 1;
         }
         assertEquals(11, nonZeroCount);
     }
@@ -73,8 +77,10 @@ public class BingoGeneratorTest {
         // then
         for (int stripe = 0; stripe < 6; ++stripe) {
             for (int row = 0; row < ticket[0].length; ++row) {
-                if (ticket[stripe * 3][row] == 0 && ticket[stripe * 3 + 1][row] == 0 && ticket[stripe * 3 + 2][row] == 0)
+                if (ticket[stripe * 3][row] == 0 && ticket[stripe * 3 + 1][row] == 0 && ticket[stripe * 3 + 2][row] == 0) {
+                    System.out.println(BingoGenerator.ticketsToString(ticket));
                     fail();
+                }
             }
         }
     }
